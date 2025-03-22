@@ -123,7 +123,6 @@ contract AllodiumJettonWallet {
 
 }
 
-    }
 
     // Handle a burn request from the owner (user-initiated token burn)
     receive(msg: TokenBurn) {
