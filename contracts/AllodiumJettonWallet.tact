@@ -144,8 +144,12 @@ contract AllodiumJettonWallet {
     }
 
     // Bounce handler: if any internal message fails and returns TON, credit it back to this wallet
-    bounced(src: bounced) {
+    bounced(msg: bounced<TokenTransferInternal>) {
         self.balance = self.balance + src.amount;
+    }
+
+    bounced(msg: bounced<TokenBurnNotification>) {
+        self.balance += msg.amount;
     }
 
     // Read-only get method: returns the data of this wallet (balance and addresses)
