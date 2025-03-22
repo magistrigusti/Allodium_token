@@ -1,7 +1,7 @@
-import "@stdlib/deploy";
+// Импортируем трейты для работы с Jetton и правами владельца
 import "@stdlib/ownable";
 
-// JettonData struct for get_jetton_data return
+// Структура с данными токена, возвращаемая через get_jetton_data
 struct JettonData {
     totalSupply: Int;
     mintable: Bool;
@@ -10,28 +10,28 @@ struct JettonData {
     walletCode: Cell;
 }
 
-// Trait implementing Jetton master (TEP-89 and TEP-74 functionalities)
+// Интерфейс токена по стандарту Jetton (TEP-89)
 @interface("org.ton.jetton.master")
 trait Jetton with Ownable {
-    // Persistent state variables (to be provided by implementing contract)
     totalSupply: Int;
     mintable: Bool;
     owner: Address;
     content: Cell;
     max_supply: Int;
 
-    // Allow owner to update token metadata content (standard TEP-64 behavior)
+    // Позволяет владельцу обновить контент токена (метаданные)
     receive(msg: TokenUpdateContent) {
-        self.requireOwner();
+        self.requireOwner(); // Проверяем, что это владелец
         self.content = msg.content;
     }
 
-    // Handle burn notifications from wallets: decrease total supply
+    // Обработка уведомления о сжигании токенов от кошельков
     receive(msg: TokenBurnNotification) {
-        self.requireWallet(msg.owner);
-        self.totalSupply = self.totalSupply - msg.amount;
+        self.requireWallet(msg.owner); // Проверяем, что сжигает владелец кошелька
+        self.totalSupply -= msg.amount;
+
+        // Возврат лишнего газа (если указан response_destination)
         if (msg.response_destination != null) {
-            // Return excess gas (if any) to the specified address
             send(SendParameters{
                 to: msg.response_destination!!,
                 value: 0,
@@ -42,19 +42,19 @@ trait Jetton with Ownable {
         }
     }
 
-    // Utility: ensure the sender is the valid wallet for the given owner
+    // Проверка: правильный ли JettonWallet прислал сообщение
     fun requireWallet(owner: Address) {
         let ctx: Context = context();
         let expected: StateInit = self.getJettonWalletInit(owner);
         require(contractAddress(expected) == ctx.sender, "Invalid wallet sender");
     }
 
-    // Get the StateInit (code and data) for a wallet for a given owner address
+    // Получение StateInit кошелька для адреса владельца
     virtual fun getJettonWalletInit(address: Address): StateInit {
         return initOf AllodiumJettonWallet(myAddress(), address);
     }
 
-    // Read-only get method: return JettonData (total supply, owner, etc.)
+    // Метод просмотра: возвращает общую информацию о токене
     get fun get_jetton_data(): JettonData {
         let code: Cell = self.getJettonWalletInit(myAddress()).code;
         return JettonData{
@@ -66,82 +66,82 @@ trait Jetton with Ownable {
         };
     }
 
-    // Read-only get method: compute wallet address for a given owner address
+    // Метод просмотра: возвращает адрес JettonWallet по адресу владельца
     get fun get_wallet_address(owner: Address): Address {
         let winit: StateInit = self.getJettonWalletInit(owner);
         return contractAddress(winit);
     }
 }
 
-// Jetton Minter Contract for Allodium (ALOD)
+// ✅ Основной контракт Allodium Jetton
 contract AllodiumJettonMinter with Jetton {
-    // State variables (inherited from Jetton trait and extended)
-    totalSupply: Int as coins;
-    mintable: Bool;
-    owner: Address;
-    content: Cell;
-    max_supply: Int as coins;
-    rewardAddress: Address;    // address where 25% of mining rewards go
-    inflationAddress: Address; // address where inflationary tokens are sent
-    lastInflationTime: Int as uint32;
+    totalSupply: Int as coins;         // Текущее общее количество токенов
+    mintable: Bool;                    // Можно ли ещё майнить (true/false)
+    owner: Address;                    // Владелец контракта
+    content: Cell;                     // Метаданные токена
+    max_supply: Int as coins;          // Лимит токенов (600 млн ALOD)
+    rewardAddress: Address;            // Кошелёк, куда идут 25% майнинга
+    inflationAddress: Address;         // Кошелёк для инфляции
+    lastInflationTime: Int as uint32;  // Последнее начисление инфляции
 
-    // Constant for decimal precision: 4 decimal places (1 token = 10^4 base units)
-    const DECIMALS_FACTOR: Int = 10000;
+    const DECIMALS_FACTOR: Int = 10000; // 4 знака после запятой
+    const INFLATION_PERIOD: Int = 15552000; // 180 дней в секундах (6 мес)
 
+    // Инициализация контракта
     init(owner: Address, content: Cell, rewardAddress: Address, inflationAddress: Address) {
         self.totalSupply = 0;
         self.mintable = true;
         self.owner = owner;
         self.content = content;
-        // Set maximum mineable supply = 600,000,000 * 10^4 (to account for 4 decimals)
         self.max_supply = 600_000_000 * DECIMALS_FACTOR;
         self.rewardAddress = rewardAddress;
         self.inflationAddress = inflationAddress;
         self.lastInflationTime = 0;
     }
 
-    // Message to mint (mine) new tokens. Only owner (mining controller) can call.
+    // Структура входящего сообщения для майнинга
     message Mine {
-        amount: Int as coins;
-        to: Address;
+        amount: Int as coins;   // Сколько токенов заминтить
+        to: Address;            // Кому отправить награду
     }
 
+    // Обработка сообщения Mine (награда за майнинг)
     receive(msg: Mine) {
-        self.requireOwner();                              // Only owner can trigger mining rewards
-        require(self.mintable, "Minting is closed");      // Mining must be open
-        // Ensure not exceeding max mineable supply
+        self.requireOwner();
+        require(self.mintable, "Minting is closed");
         require(self.totalSupply + msg.amount <= self.max_supply, "Max supply exceeded");
-        // Split reward: 75% to recipient, 25% to reward pool
-        let poolPart: Int = msg.amount / 4;          // 25% (floored if not divisible)
-        let userPart: Int = msg.amount - poolPart;   // remaining 75%
-        // Update total supply with the full amount
-        self.totalSupply = self.totalSupply + msg.amount;
-        // Gas requirements: ensure enough TON attached for two internal transfers
-        let ctx: Context = context();
-        require(ctx.value >= ton("0.02"), "Not enough TON for mining mint");
-        // Prepare StateInit for reward pool wallet and user wallet
+
+        // Разделяем награду: 75% пользователю, 25% в пул
+        let poolPart: Int = msg.amount / 4;
+        let userPart: Int = msg.amount - poolPart;
+
+        self.totalSupply += msg.amount;
+
+        // Отправляем 25% в пул
         let initPool: StateInit = self.getJettonWalletInit(self.rewardAddress);
         let poolWallet: Address = contractAddress(initPool);
-        let initUser: StateInit = self.getJettonWalletInit(msg.to);
-        let userWallet: Address = contractAddress(initUser);
-        // Send tokens to reward pool (25% of reward)
+
         send(SendParameters{
             to: poolWallet,
-            value: ton("0.01"),       // forward a small amount to cover storage
+            value: ton("0.01"),
             bounce: false,
             mode: 0,
             body: TokenTransferInternal{
                 queryId: 0,
                 amount: poolPart,
-                from: myAddress(),                // tokens minted from root
-                response_destination: self.owner, // return any excess gas to owner
+                from: myAddress(),
+                response_destination: self.owner,
                 forward_ton_amount: 0,
                 forward_payload: emptySlice()
             }.toCell(),
             code: initPool.code,
             data: initPool.data
         });
-        // Send tokens to user (75% of reward), forwarding all remaining value
+
+        // Отправляем 75% пользователю
+        let initUser: StateInit = self.getJettonWalletInit(msg.to);
+        let userWallet: Address = contractAddress(initUser);
+
         send(SendParameters{
             to: userWallet,
             value: 0,
@@ -151,7 +151,7 @@ contract AllodiumJettonMinter with Jetton {
                 queryId: 0,
                 amount: userPart,
                 from: myAddress(),
-                response_destination: self.owner,  // excess gas back to owner
+                response_destination: self.owner,
                 forward_ton_amount: 0,
                 forward_payload: emptySlice()
             }.toCell(),
@@ -160,43 +160,38 @@ contract AllodiumJettonMinter with Jetton {
         });
     }
 
-    // Command to close mining (disable further minting). Only owner can call. 
-    // Once called, inflation schedule begins.
+    // Закрываем фазу майнинга (запускаем инфляцию)
     receive("CloseMinting") {
         self.requireOwner();
-        require(self.mintable, "Minting already closed");
+        require(self.mintable, "Already closed");
         self.mintable = false;
-        // Set last inflation time to now, so next inflation occurs 180 days from this point
-        self.lastInflationTime = now();
+        self.lastInflationTime = now(); // Запоминаем время
     }
 
-    // Trigger the inflation mechanism after mining phase. Can be called by anyone when due.
+    // Инфляционное начисление 0.5% (разрешено после закрытия майнинга)
     receive("DistributeInflation") {
-        // Inflation only allowed after mining is finished
-        require(!self.mintable, "Mining not yet ended");
-        // 180 days period in seconds (approximately)
-        const INFLATION_PERIOD: Int = 15552000;
-        // Check that at least 180 days have passed since last inflation distribution
-        require(now() >= self.lastInflationTime + INFLATION_PERIOD, "Too early for inflation");
-        // Calculate 0.5% of current totalSupply (in base units)
-        let increment: Int = self.totalSupply / 200;  // 0.5% = 1/200 (integer division)
-        require(increment > 0, "No inflation increment");  // If 0 (very low supply), skip
-        // Update last inflation timestamp to current time
+        require(!self.mintable, "Minting not closed");
+        require(now() >= self.lastInflationTime + INFLATION_PERIOD, "Too early");
+
+        let increment: Int = self.totalSupply / 200; // 0.5%
+        require(increment > 0, "Nothing to mint");
+
         self.lastInflationTime = now();
-        // Mint the inflationary tokens to the designated inflation address
-        // Use caller as response destination to refund any excess gas
-        let ctx: Context = context();
-        self.mintJetton(self.inflationAddress, increment, ctx.sender);
+
+        // Минтим инфляционные токены на inflationAddress
+        self.mintJetton(self.inflationAddress, increment, context().sender);
     }
 
-    // Internal function to mint jettons to a specified address (deploys or transfers to wallet)
+    // Минтим токены (внутренняя функция)
     fun mintJetton(to: Address, amount: Int, response_destination: Address) {
         if (self.mintable) {
-            // Enforce cap only during mining phase
-            require(self.totalSupply + amount <= self.max_supply, "Max supply exceeded");
+            require(self.totalSupply + amount <= self.max_supply, "Mint limit exceeded");
         }
-        self.totalSupply = self.totalSupply + amount;
+
+        self.totalSupply += amount;
+
         let winit: StateInit = self.getJettonWalletInit(to);
+
         send(SendParameters{
             to: contractAddress(winit),
             value: 0,
@@ -215,43 +210,13 @@ contract AllodiumJettonMinter with Jetton {
         });
     }
 
-    // Override Jetton trait's wallet init function to use AllodiumJettonWallet contract
+    // Переопределяем генерацию JettonWallet
     override fun getJettonWalletInit(address: Address): StateInit {
         return initOf AllodiumJettonWallet(myAddress(), address);
     }
 
-    // Override trait mint (not exposed externally) to use our mintJetton logic
+    // Обёртка над mintJetton (если захочешь использовать вручную)
     override fun mint(to: Address, amount: Int, response_destination: Address) {
         self.mintJetton(to, amount, response_destination);
     }
-}
-
-// Standard Jetton message and data definitions used by the contracts
-
-// Internal transfer message (sent from Jetton Minter to Jetton Wallet or between wallets)
-message(0x178d4519) TokenTransferInternal {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    from: Address;
-    response_destination: Address;
-    forward_ton_amount: Int as coins;
-    forward_payload: Slice as remaining;
-}
-
-// Notification from Jetton Wallet to Jetton Minter when tokens are burned
-message(0x7bdd97de) TokenBurnNotification {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    owner: Address;
-    response_destination: Address?;
-}
-
-// Excess gas credit message (sent to return unused gas)
-message(0xd53276db) TokenExcesses {
-    queryId: Int as uint64;
-}
-
-// Message to update jetton content (metadata), only callable by owner
-message TokenUpdateContent {
-    content: Cell;
 }
