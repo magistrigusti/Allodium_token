@@ -103,21 +103,26 @@ contract AllodiumJettonWallet {
             });
         }
         // Return any remaining TON (excess gas) back to the original sender if requested
-        if (msg.response_destination != null) {
-            // Calculate remaining value after deducting storage fees and forwarded TON
+        if (maybe(msg.response_destination)) {
             let msgValue: Int = ctx.value;
             let tonBefore: Int = myBalance() - msgValue;
             let storageFee: Int = self.minTonsForStorage - min(tonBefore, self.minTonsForStorage);
             msgValue = msgValue - (storageFee + self.gasConsumption);
             msgValue = msgValue - msg.forward_ton_amount - ctx.readForwardFee();
+
             send(SendParameters{
-                to: msg.response_destination,
+                to: msg.response_destination!!,
                 value: msgValue,
                 bounce: false,
                 body: TokenExcesses{ queryId: msg.queryId }.toCell(),
                 mode: SendIgnoreErrors
-            });
-        }
+        });
+}
+
+    }
+
+}
+
     }
 
     // Handle a burn request from the owner (user-initiated token burn)
