@@ -65,6 +65,7 @@ trait Jetton with Ownable {
 }
 
 contract AllodiumJettonMinter with Jetton {
+    nftRegistry: Address;
     totalSupply: Int as coins;         
     mintable: Bool;                    
     owner: Address;                    
@@ -78,7 +79,7 @@ contract AllodiumJettonMinter with Jetton {
     const INFLATION_PERIOD: Int = 15552000; 
 
     
-    init(owner: Address, content: Cell, rewardAddress: Address, inflationAddress: Address) {
+    init(owner: Address, content: Cell, rewardAddress: Address, inflationAddress: Address, nftRegistry: Address) {
         self.totalSupply = 0;
         self.mintable = true;
         self.owner = owner;
@@ -87,6 +88,7 @@ contract AllodiumJettonMinter with Jetton {
         self.rewardAddress = rewardAddress;
         self.inflationAddress = inflationAddress;
         self.lastInflationTime = 0;
+        self.nftRegistry = nftRegistry;
     }
 
     
@@ -150,7 +152,6 @@ contract AllodiumJettonMinter with Jetton {
         });
     }
 
-    
     receive("CloseMinting") {
         self.requireOwner();
         require(self.mintable, "Already closed");
@@ -158,7 +159,6 @@ contract AllodiumJettonMinter with Jetton {
         self.lastInflationTime = now(); 
     }
 
-    
     receive("DistributeInflation") {
         require(!self.mintable, "Minting not closed");
         require(now() >= self.lastInflationTime + INFLATION_PERIOD, "Too early");
@@ -172,6 +172,11 @@ contract AllodiumJettonMinter with Jetton {
         self.mintJetton(self.inflationAddress, increment, context().sender);
     }
 
+    fun getNftBonus(owner: Address): Int {
+    // Вызываем внешний контракт (например, NFT Registry), который возвращает лучший бонус
+        let bonus: Int = call(self.nftRegistry, "getBonusFor", owner);
+        return bonus;
+    }   
     
     fun mintJetton(to: Address, amount: Int, response_destination: Address) {
         if (self.mintable) {
