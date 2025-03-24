@@ -12,9 +12,6 @@ struct  WalletData {
 }
 
 contract AllodiumJettonWallet {
-    const minTonsForStorage: Int = ton("0.01");
-    const gasConsumption: Int = ton("0.01");
-
     balance: Int;
     owner: Address;
     master: Address;
@@ -83,7 +80,6 @@ contract AllodiumJettonWallet {
     }
 
     receive(msg: TokenTransferInternal) { 
-
         let ctx: Context = context();
 
         if (ctx.sender != self.master) {
@@ -126,6 +122,15 @@ contract AllodiumJettonWallet {
                 mode: SendIgnoreErrors
         });
         }
+
+    }
+
+    receive(msg: ChangeContent) {
+        self.requireOwner(); 
+        self.content = msg.jettonContent;
+    }
+
+    receive(msg: Inflation) {
 
     }
 
