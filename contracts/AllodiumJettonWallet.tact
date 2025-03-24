@@ -1,31 +1,39 @@
+import "@stdlib/ownable";
 import "@stdlib/deploy";
+import "./messages";
+import "./constans";
 @interface("org.ton.jetton.wallet")
-contract AllodiumJettonWallet {
-    // Constants for minimum storage rent and gas consumption fees
-    const minTonsForStorage: Int = ton("0.01");
-    const gasConsumption: Int = ton("0.01");
 
-    // State variables
+struct  WalletData {
     balance: Int;
     owner: Address;
     master: Address;
+    walletCode: Cell;
+}
 
-    init(master: Address, owner: Address) {
+contract AllodiumJettonWallet {
+    const minTonsForStorage: Int = ton("0.01");
+    const gasConsumption: Int = ton("0.01");
+
+    balance: Int;
+    owner: Address;
+    master: Address;
+    inflation: Address;
+
+    init(master: Address, owner: Address, inflation: Address) {
         self.balance = 0;
         self.owner = owner;
         self.master = master;
+        self.inlation = inflation;
     }
 
-    // Handle direct transfer from the owner of this wallet
     receive(msg: TokenTransfer) {
         let ctx: Context = context();
         require(ctx.sender == self.owner, "Invalid sender");
 
-        // Calculate burn commission of 0.01% and the amount to transfer out
         let burnAmount: Int = msg.amount / 10000;         // 0.01% of transfer
         let transferAmount: Int = msg.amount - burnAmount;
 
-        // Deduct the full amount (including the portion to burn) from this wallet's balance
         self.balance = self.balance - msg.amount;
         require(self.balance >= 0, "Invalid balance");
 
@@ -74,10 +82,10 @@ contract AllodiumJettonWallet {
         });
     }
 
-    // Handle incoming internal jetton transfer from another wallet or the minter
-    receive(msg: TokenTransferInternal) {
+    receive(msg: TokenTransferInternal) { 
+
         let ctx: Context = context();
-        // Verify sender: must be the jetton master or another AllodiumJettonWallet
+
         if (ctx.sender != self.master) {
             let initSender: StateInit = initOf AllodiumJettonWallet(self.master, msg.from);
             require(contractAddress(initSender) == ctx.sender, "Invalid sender");
@@ -117,37 +125,10 @@ contract AllodiumJettonWallet {
                 body: TokenExcesses{ queryId: msg.queryId }.toCell(),
                 mode: SendIgnoreErrors
         });
-}
+        }
 
     }
 
-}
-
-
-    // Handle a burn request from the owner (user-initiated token burn)
-    receive(msg: TokenBurn) {
-        let ctx: Context = context();
-        require(ctx.sender == self.owner, "Invalid sender");
-        self.balance = self.balance - msg.amount;
-        require(self.balance >= 0, "Invalid balance");
-        let fwdFee: Int = ctx.readForwardFee();
-        require(ctx.value > fwdFee + 2 * self.gasConsumption + self.minTonsForStorage, "Invalid value - Burn");
-        // Send a burn notification to the jetton master to update total supply
-        send(SendParameters{
-            to: self.master,
-            value: 0,
-            bounce: true,
-            mode: SendRemainingValue,
-            body: TokenBurnNotification{
-                queryId: msg.queryId,
-                amount: msg.amount,
-                owner: self.owner,
-                response_destination: self.owner
-            }.toCell()
-        });
-    }
-
-    // Bounce handler: if any internal message fails and returns TON, credit it back to this wallet
     bounced(msg: bounced<TokenTransferInternal>) {
         self.balance = self.balance + src.amount;
     }
@@ -156,72 +137,14 @@ contract AllodiumJettonWallet {
         self.balance += msg.amount;
     }
 
-    // Read-only get method: returns the data of this wallet (balance and addresses)
-    get fun get_wallet_data(): JettonWalletData {
-        return JettonWalletData{
+    get fun get_wallet_data(): WalletData {
+        return WalletData{
             balance: self.balance,
             owner: self.owner,
             master: self.master,
             walletCode: (initOf AllodiumJettonWallet(self.master, self.owner)).code
         };
     }
+
 }
 
-// Supporting data structures and message definitions for the Jetton wallet
-
-struct JettonWalletData {
-    balance: Int;
-    owner: Address;
-    master: Address;
-    walletCode: Cell;
-}
-
-// External transfer message (from user to their wallet)
-message(0xf8a7ea5) TokenTransfer {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    destination: Address;
-    response_destination: Address;
-    custom_payload: Cell?;
-    forward_ton_amount: Int as coins;
-    forward_payload: Slice as remaining;
-}
-
-// Internal transfer message (from one wallet or minter to another wallet)
-message(0x178d4519) TokenTransferInternal {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    from: Address;
-    response_destination: Address;
-    forward_ton_amount: Int as coins;
-    forward_payload: Slice as remaining;
-}
-
-// Notification to wallet owner about incoming transfer (with forwarded payload)
-message(0x7362d09c) TokenNotification {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    from: Address;
-    forward_payload: Slice as remaining;
-}
-
-// Burn message (from user to their wallet to burn tokens)
-message(0x595f07bc) TokenBurn {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    owner: Address;
-    response_destination: Address;
-}
-
-// Burn notification (from wallet to master after burning tokens)
-message(0x7bdd97de) TokenBurnNotification {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    owner: Address;
-    response_destination: Address?;
-}
-
-// Excess gas credit message (return unused TON to sender)
-message(0xd53276db) TokenExcesses {
-    queryId: Int as uint64;
-}

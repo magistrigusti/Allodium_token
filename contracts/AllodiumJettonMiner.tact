@@ -74,10 +74,6 @@ contract AllodiumJettonMinter with Jetton {
     rewardAddress: Address;           
     inflationAddress: Address;         
     lastInflationTime: Int as uint32;  
-
-    const DECIMALS_FACTOR: Int = 10000; 
-    const INFLATION_PERIOD: Int = 15552000; 
-
     
     init(owner: Address, content: Cell, rewardAddress: Address, inflationAddress: Address, nftRegistry: Address) {
         self.totalSupply = 0;
@@ -91,11 +87,6 @@ contract AllodiumJettonMinter with Jetton {
         self.nftRegistry = nftRegistry;
     }
 
-    
-    message Mine {
-        amount: Int as coins;   
-        to: Address;            
-    }
 
     
     receive(msg: Mine) {

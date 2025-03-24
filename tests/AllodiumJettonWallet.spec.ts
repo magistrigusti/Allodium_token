@@ -1,19 +1,18 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { toNano } from '@ton/core';
-import { Allodium } from '../wrappers/Allodium';
+import { AllodiumJettonWallet } from '../wrappers/Allodium';
 import '@ton/test-utils';
 
 describe('Allodium', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
-    let allodium: SandboxContract<Allodium>;
+    let allodium: SandboxContract<AllodiumJettonWallet>;
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
+        deployer = await blockchain.treasury('deployer');
 
         allodium = blockchain.openContract(await Allodium.fromInit());
-
-        deployer = await blockchain.treasury('deployer');
 
         const deployResult = await allodium.send(
             deployer.getSender(),
