@@ -1,7 +1,7 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { toNano } from '@ton/core';
+import { toNano, beginCell, Cell } from '@ton/core';
+import { compile } from '@ton/blueprint';
 import { AllodiumJettonWallet } from '../wrappers/AllodiumJettonWallet';
-import { AllodiumJettonMiner } from '../wrappers/AllodiumJettonMiner';
 import '@ton/test-utils';
 
 describe('AllodiumJettonWallet', () => {
@@ -9,33 +9,32 @@ describe('AllodiumJettonWallet', () => {
     let deployer: SandboxContract<TreasuryContract>;
     let masterWallet: SandboxContract<TreasuryContract>;
     let userWallet: SandboxContract<AllodiumJettonWallet>;
-    let inflation: SandboxContract<AllodiumJettonMiner>;
+    let walletCode: Cell;
+
+    beforeAll(async () => {
+        walletCode = await compile('AllodiumJettonWallet');
+    });
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
         deployer = await blockchain.treasury('deployer');
         masterWallet = await blockchain.treasury('master');
-        inflation = await blockchain.treasury('inflation');
 
         userWallet = blockchain.openContract(
-            await AllodiumJettonWallet.fromInit(
-                masterWallet.address,
-                deployer.address,
-                inflation.address
+            AllodiumJettonWallet.createFromConfig(
+                {
+                    masterAddress: masterWallet.address,
+                    ownerAddress: deployer.address,
+                    inflationAddress: deployer.address,
+                },
+                walletCode
             )
         );
 
-        const deployResult = await userWallet.send(
-            deployer.getSender(),
-            { value: toNano('0.05')},
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            }
-        );
+        const deployResult = await userWallet.sendDeploy(deployer.getSender(), toNano('0.05'));
 
-        expect(deployResult.transaction).toHaveTransaction({
+        expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: userWallet.address,
             deploy: true,
@@ -43,11 +42,10 @@ describe('AllodiumJettonWallet', () => {
         });
     });
 
-
     it('should correctly initialize wallet data', async () => {
         const data = await userWallet.getWalletData();
 
-        expect(data.balance.toNumber()).toBe(0);
+        expect(data.balance).toBe(0n);
         expect(data.owner.equals(deployer.address)).toBeTruthy();
         expect(data.master.equals(masterWallet.address)).toBeTruthy();
     });
@@ -55,56 +53,49 @@ describe('AllodiumJettonWallet', () => {
     it('should correctly process internal token transfer', async () => {
         const transferAmount = toNano('10');
 
-        await userWallet.sendInternalMessage({
-            from: masterWallet.address,
+        const tokenTransferInternalBody = beginCell()
+            .storeUint(0x178d4519, 32)
+            .storeUint(1n, 64)
+            .storeCoins(transferAmount)
+            .storeAddress(masterWallet.address)
+            .storeAddress(masterWallet.address)
+            .storeCoins(0)
+            .storeRef(beginCell().endCell())
+            .endCell();
+
+        await masterWallet.send({
+            to: userWallet.address,
             value: toNano('0.05'),
-            body: {
-                $$type: 'TokenTransferInternal',
-                query_id: 1n,
-                amount: transferAmount,
-                from: masterWallet.address,
-                response_destination: masterWallet.address,
-                forward_ton_amount: 0n,
-                forward_payload: Buffer.alloc(0)
-            }
+            body: tokenTransferInternalBody,
         });
 
         const dataAfterTransfer = await userWallet.getWalletData();
-        expect(dataAfterTransfer.balance.toString()).toBe(transferAmount.toString());
+        expect(dataAfterTransfer.balance).toBe(transferAmount);
     });
 
     it('should burn tokens correctly', async () => {
         const initialAmount = toNano('20');
         const burnAmount = toNano('5');
 
-        await userWallet.sendInternalMessage({
-            from: masterWallet.address,
+        const tokenTransferInternalBody = beginCell()
+            .storeUint(0x178d4519, 32)
+            .storeUint(2n, 64)
+            .storeCoins(initialAmount)
+            .storeAddress(masterWallet.address)
+            .storeAddress(masterWallet.address)
+            .storeCoins(0)
+            .storeRef(beginCell().endCell())
+            .endCell();
+
+        await masterWallet.send({
+            to: userWallet.address,
             value: toNano('0.05'),
-            body: {
-                $$type: "TokenTransferinternal",
-                query_id: 2n,
-                amount: initialAmount,
-                from: masterWallet.address,
-                response_estination: masterWallet.address,
-                forward_ton_amount: 0n,
-                forward_payoad: Buffer.alloc(0)
-            }
+            body: tokenTransferInternalBody,
         });
 
-        await userWallet.send(
-            deployer.getSender(),
-            { value: toNano('0.05')},
-            {
-                $$type: 'Burn',
-                query_id: 3n,
-                amount: burnAmount,
-                response_destination: deployer.address,
-                custom_payload: null,
-            }
-        );
+        await userWallet.sendBurn(deployer.getSender(), burnAmount);
 
         const dataAfterBurn = await userWallet.getWalletData();
-        expect(dataAfterBurn.balance.toString()).toBe(toNano('15').toString());
+        expect(dataAfterBurn.balance).toBe(initialAmount - burnAmount);
     });
-
 });
