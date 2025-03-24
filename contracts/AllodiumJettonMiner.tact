@@ -1,5 +1,7 @@
-
 import "@stdlib/ownable";
+import "@stdlib/deploy";
+import "./messages";
+import "./constans";
 
 struct JettonData {
     totalSupply: Int;
@@ -161,6 +163,18 @@ contract AllodiumJettonMinter with Jetton {
 
         
         self.mintJetton(self.inflationAddress, increment, context().sender);
+    }
+
+    receive(msg: Inflation) {
+        require(self.lastInflationTime > 0, "Minting has not started");
+        require(now() >= self.lastInflationTime + INFLATION_PERIOD, "Too early");
+
+
+        let increment: Int = self.totalSupply / 200;
+        require(increment > 0, "Nothing to mint");
+
+        self.lastInflationTime = now();
+        self.mintJetton(msg.from, msg.amount, msg.to);
     }
 
     fun getNftBonus(owner: Address): Int {

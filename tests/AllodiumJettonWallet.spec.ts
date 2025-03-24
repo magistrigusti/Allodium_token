@@ -1,40 +1,53 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { toNano } from '@ton/core';
-import { AllodiumJettonWallet } from '../wrappers/Allodium';
+import { AllodiumJettonWallet } from '../wrappers/AllodiumJettonWallet';
+import { AllodiumJettonMiner } from '../wrappers/AllodiumJettonMiner';
 import '@ton/test-utils';
 
-describe('Allodium', () => {
+describe('AllodiumJettonWallet', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
-    let allodium: SandboxContract<AllodiumJettonWallet>;
+    let masterWallet: SandboxContract<TreasuryContract>;
+    let userWallet: SandboxContract<AllodiumJettonWallet>;
+    let inflation: SandboxContract<AllodiumJettonMiner>;
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
+
         deployer = await blockchain.treasury('deployer');
+        masterWallet = await blockchain.treasury('master');
+        inflation = await blockchain.treasury('inflation');
 
-        allodium = blockchain.openContract(await Allodium.fromInit());
+        userWallet = blockchain.openContract(
+            await AllodiumJettonWallet.fromInit(
+                masterWallet.address,
+                deployer.address,
+                inflation.address
+            )
+        );
 
-        const deployResult = await allodium.send(
+        const deployResult = await userWallet.send(
             deployer.getSender(),
-            {
-                value: toNano('0.05'),
-            },
+            { value: toNano('0.05')},
             {
                 $$type: 'Deploy',
                 queryId: 0n,
             }
         );
 
-        expect(deployResult.transactions).toHaveTransaction({
+        expect(deployResult.transaction).toHaveTransaction({
             from: deployer.address,
-            to: allodium.address,
+            to: userWallet.address,
             deploy: true,
-            success: true,
+            success: true
         });
     });
 
-    it('should deploy', async () => {
-        // the check is done inside beforeEach
-        // blockchain and allodium are ready to use
+
+    it('should correctly initialize wallet data', async () => {
+        const data = await userWallet.getWalletData();
+
+        expect(data.balance.toNumber()).toBe(0);
     });
+
 });

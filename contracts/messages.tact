@@ -4,6 +4,7 @@ message(0xd8cfdaf1) Inflation {
     query_id: Int as uint64;
     amount: Int as coins;
     from: Address;
+    to: Address;
 }
 
 message(0xf8448400) TaxBurn {

@@ -11,7 +11,7 @@ struct  WalletData {
     walletCode: Cell;
 }
 
-contract AllodiumJettonWallet {
+contract AllodiumJettonWallet with Ownable, Deployable {
     balance: Int;
     owner: Address;
     master: Address;
@@ -21,7 +21,8 @@ contract AllodiumJettonWallet {
         self.balance = 0;
         self.owner = owner;
         self.master = master;
-        self.inlation = inflation;
+        self.inflation = inflation;
+
     }
 
     receive(msg: TokenTransfer) {
@@ -130,12 +131,8 @@ contract AllodiumJettonWallet {
         self.content = msg.jettonContent;
     }
 
-    receive(msg: Inflation) {
-
-    }
-
     bounced(msg: bounced<TokenTransferInternal>) {
-        self.balance = self.balance + src.amount;
+        self.balance = self.balance + msg.amount;
     }
 
     bounced(msg: bounced<TokenBurnNotification>) {

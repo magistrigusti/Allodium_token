@@ -1,5 +1,5 @@
 import { toNano } from '@ton/core';
-import { Allodium } from '../wrappers/Allodium';
+import { Allodium } from '../wrappers/AllodiumJettonWallet';
 import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
