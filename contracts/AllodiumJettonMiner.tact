@@ -11,7 +11,6 @@ struct JettonData {
     walletCode: Cell;
 }
 
-@interface("org.ton.jetton.master")
 trait Jetton with Ownable {
     totalSupply: Int;
     mintable: Bool;
