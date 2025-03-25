@@ -6,10 +6,11 @@ import '@ton/test-utils';
 
 describe('AllodiumJettonWallet', () => {
     let blockchain: Blockchain;
+    let walletCode: Cell;
+    let wallet: SandboxContract<AllodiumJettonWallet>;
     let deployer: SandboxContract<TreasuryContract>;
     let masterWallet: SandboxContract<TreasuryContract>;
-    let userWallet: SandboxContract<AllodiumJettonWallet>;
-    let walletCode: Cell;
+    let inflationWallet: SandboxContract<TreasuryContract>;
 
     beforeAll(async () => {
         walletCode = await compile('AllodiumJettonWallet');
@@ -20,40 +21,41 @@ describe('AllodiumJettonWallet', () => {
 
         deployer = await blockchain.treasury('deployer');
         masterWallet = await blockchain.treasury('master');
+        inflationWallet = await blockchain.treasury('inflation');
 
-        userWallet = blockchain.openContract(
+        wallet = blockchain.openContract(
             AllodiumJettonWallet.createFromConfig(
                 {
                     masterAddress: masterWallet.address,
                     ownerAddress: deployer.address,
-                    inflationAddress: deployer.address,
+                    inflationAddress: inflationWallet.address,
                 },
                 walletCode
             )
         );
 
-        const deployResult = await userWallet.sendDeploy(deployer.getSender(), toNano('0.05'));
+        const deployResult = await wallet.sendDeploy(deployer.getSender(), toNano('0.05'));
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
-            to: userWallet.address,
+            to: wallet.address,
             deploy: true,
-            success: true
+            success: true,
         });
     });
 
-    it('should correctly initialize wallet data', async () => {
-        const data = await userWallet.getWalletData();
+    it('should initialize wallet correctly', async () => {
+        const data = await wallet.getWalletData();
 
         expect(data.balance).toBe(0n);
         expect(data.owner.equals(deployer.address)).toBeTruthy();
         expect(data.master.equals(masterWallet.address)).toBeTruthy();
     });
 
-    it('should correctly process internal token transfer', async () => {
-        const transferAmount = toNano('10');
+    it('should receive internal transfers correctly', async () => {
+        const transferAmount = toNano('15');
 
-        const tokenTransferInternalBody = beginCell()
+        const internalTransfer = beginCell()
             .storeUint(0x178d4519, 32)
             .storeUint(1n, 64)
             .storeCoins(transferAmount)
@@ -63,17 +65,17 @@ describe('AllodiumJettonWallet', () => {
             .storeRef(beginCell().endCell())
             .endCell();
 
-        await masterWallet.send({
-            to: userWallet.address,
-            value: toNano('0.05'),
-            body: tokenTransferInternalBody,
-        });
+        await wallet.send(
+            masterWallet.getSender(),
+            { value: toNano('0.05') },
+            internalTransfer
+        );
 
-        const dataAfterTransfer = await userWallet.getWalletData();
-        expect(dataAfterTransfer.balance).toBe(transferAmount);
+        const dataAfter = await wallet.getWalletData();
+        expect(dataAfter.balance).toBe(transferAmount);
     });
 
-    it('should burn tokens correctly', async () => {
+    it('should handle token burn correctly', async () => {
         const initialAmount = toNano('20');
         const burnAmount = toNano('5');
 
@@ -87,15 +89,34 @@ describe('AllodiumJettonWallet', () => {
             .storeRef(beginCell().endCell())
             .endCell();
 
-        await masterWallet.send({
-            to: userWallet.address,
-            value: toNano('0.05'),
-            body: tokenTransferInternalBody,
-        });
+        await wallet.send(
+            masterWallet.getSender(),
+            { value: toNano('0.05') },
+            tokenTransferInternalBody
+        );
 
-        await userWallet.sendBurn(deployer.getSender(), burnAmount);
+        await wallet.sendBurn(deployer.getSender(), burnAmount);
 
-        const dataAfterBurn = await userWallet.getWalletData();
+        const dataAfterBurn = await wallet.getWalletData();
         expect(dataAfterBurn.balance).toBe(initialAmount - burnAmount);
+    });
+
+    it('should correctly handle burn notification bounce', async () => {
+        const burnNotificationBody = beginCell()
+            .storeUint(0x7bdd97de, 32)
+            .storeUint(3n, 64)
+            .storeCoins(toNano('5'))
+            .storeAddress(wallet.address)
+            .storeAddress(deployer.address)
+            .endCell();
+
+        await wallet.send(
+            deployer.getSender(),
+            { value: toNano('0.05') },
+            burnNotificationBody
+        );
+
+        const finalData = await wallet.getWalletData();
+        expect(finalData.balance).toBe(0n);
     });
 });
