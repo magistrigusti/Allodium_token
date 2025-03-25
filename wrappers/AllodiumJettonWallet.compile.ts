@@ -2,7 +2,7 @@ import { CompilerConfig } from '@ton/blueprint';
 
 export const compile: CompilerConfig = {
     lang: 'tact',
-    target: 'contracts/allodium.tact',
+    target: 'contracts/AllodiumJettonWallet.tact',
     options: {
         debug: true,
     },

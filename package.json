@@ -8,7 +8,7 @@
     "test": "jest --verbose"
   },
   "devDependencies": {
-    "@tact-lang/compiler": "^1.6.0",
+    "@tact-lang/compiler": "^1.6.4",
     "@ton-community/func-js": "^0.9.1",
     "@ton/blueprint": "^0.29.0",
     "@ton/core": "^0.60.1",

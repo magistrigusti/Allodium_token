@@ -65,12 +65,13 @@ describe('AllodiumJettonWallet', () => {
             .storeRef(beginCell().endCell())
             .endCell();
 
-        await wallet.send(
-            masterWallet.getSender(),
-            { value: toNano('0.05') },
-            internalTransfer
-        );
-
+            await blockchain.sendInternalMessage({
+                from: deployer.address,
+                to: wallet.address,
+                value: toNano('0.05'),
+                body: internalTransfer,
+            });
+              
         const dataAfter = await wallet.getWalletData();
         expect(dataAfter.balance).toBe(transferAmount);
     });
@@ -89,7 +90,7 @@ describe('AllodiumJettonWallet', () => {
             .storeRef(beginCell().endCell())
             .endCell();
 
-        await wallet.send(
+        await wallet.sendInternalMessage(
             masterWallet.getSender(),
             { value: toNano('0.05') },
             tokenTransferInternalBody
@@ -110,7 +111,7 @@ describe('AllodiumJettonWallet', () => {
             .storeAddress(deployer.address)
             .endCell();
 
-        await wallet.send(
+        await wallet.sendInternalMessage(
             deployer.getSender(),
             { value: toNano('0.05') },
             burnNotificationBody

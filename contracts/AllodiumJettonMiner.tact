@@ -1,7 +1,7 @@
 import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "./messages";
-import "./constans";
+import "./constants";
 
 struct JettonData {
     totalSupply: Int;
