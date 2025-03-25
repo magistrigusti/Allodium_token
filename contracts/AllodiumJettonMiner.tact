@@ -2,6 +2,7 @@ import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "./messages";
 import "./constants";
+import "./AllodiumJettonWallet"; // на случай initOf
 
 struct JettonData {
     totalSupply: Int;
@@ -22,46 +23,43 @@ trait Jetton with Ownable {
         self.requireOwner(); 
         self.content = msg.content;
     }
- 
-    receive(msg: TokenBurnNotification) {
-        self.requireWallet(msg.owner); 
+
+    receive(msg: BurnNotification) {
+        self.requireWallet(msg.sender); 
         self.totalSupply -= msg.amount;
 
-        if (msg.response_destination != null) {
-            send(SendParameters{
-                to: msg.response_destination!!,
-                value: 0,
-                bounce: false,
-                mode: SendRemainingValue + SendIgnoreErrors,
-                body: TokenExcesses{ queryId: msg.queryId }.toCell()
-            });
-        }
+        send(SendParameters{
+            to: msg.response_destination,
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: Excesses{ query_id: msg.query_id }.toCell()
+        });
     }
 
     fun requireWallet(owner: Address) {
-        let ctx: Context = context();
-        let expected: StateInit = self.getJettonWalletInit(owner);
+        let ctx = context();
+        let expected = self.getJettonWalletInit(owner);
         require(contractAddress(expected) == ctx.sender, "Invalid wallet sender");
     }
 
     virtual fun getJettonWalletInit(address: Address): StateInit {
-        return initOf AllodiumJettonWallet(myAddress(), address);
+        return initOf AllodiumJettonWallet(myAddress(), address, self.inflationAddress);
     }
 
     get fun get_jetton_data(): JettonData {
-        let code: Cell = self.getJettonWalletInit(myAddress()).code;
+        let code = self.getJettonWalletInit(myAddress()).code;
         return JettonData{
-            totalSupply: self.totalSupply,
-            mintable: self.mintable,
-            owner: self.owner,
-            content: self.content,
-            walletCode: code
+            totalSupply: self.totalSupply;
+            mintable: self.mintable;
+            owner: self.owner;
+            content: self.content;
+            walletCode: code;
         };
     }
 
     get fun get_wallet_address(owner: Address): Address {
-        let winit: StateInit = self.getJettonWalletInit(owner);
-        return contractAddress(winit);
+        return contractAddress(self.getJettonWalletInit(owner));
     }
 }
 
@@ -88,59 +86,51 @@ contract AllodiumJettonMinter with Jetton {
         self.nftRegistry = nftRegistry;
     }
 
-
-    
     receive(msg: Mine) {
         self.requireOwner();
         require(self.mintable, "Minting is closed");
         require(self.totalSupply + msg.amount <= self.max_supply, "Max supply exceeded");
 
-        
-        let poolPart: Int = msg.amount / 4;
-        let userPart: Int = msg.amount - poolPart;
+        let poolPart = msg.amount / 4;
+        let userPart = msg.amount - poolPart;
 
         self.totalSupply += msg.amount;
 
-        
-        let initPool: StateInit = self.getJettonWalletInit(self.rewardAddress);
-        let poolWallet: Address = contractAddress(initPool);
+        let poolWallet = contractAddress(self.getJettonWalletInit(self.rewardAddress));
+        let userWallet = contractAddress(self.getJettonWalletInit(msg.to));
 
         send(SendParameters{
             to: poolWallet,
             value: ton("0.01"),
             bounce: false,
             mode: 0,
-            body: TokenTransferInternal{
-                queryId: 0,
-                amount: poolPart,
-                from: myAddress(),
-                response_destination: self.owner,
-                forward_ton_amount: 0,
-                forward_payload: emptySlice()
+            body: TransferInternal{
+                query_id: 0;
+                amount: poolPart;
+                from: myAddress();
+                response_destination: self.owner;
+                forward_ton_amount: 0;
+                forward_payload: emptySlice();
             }.toCell(),
-            code: initPool.code,
-            data: initPool.data
+            code: self.getJettonWalletInit(self.rewardAddress).code,
+            data: self.getJettonWalletInit(self.rewardAddress).data
         });
-
-        
-        let initUser: StateInit = self.getJettonWalletInit(msg.to);
-        let userWallet: Address = contractAddress(initUser);
 
         send(SendParameters{
             to: userWallet,
             value: 0,
             bounce: false,
             mode: SendRemainingValue,
-            body: TokenTransferInternal{
-                queryId: 0,
-                amount: userPart,
-                from: myAddress(),
-                response_destination: self.owner,
-                forward_ton_amount: 0,
-                forward_payload: emptySlice()
+            body: TransferInternal{
+                query_id: 0;
+                amount: userPart;
+                from: myAddress();
+                response_destination: self.owner;
+                forward_ton_amount: 0;
+                forward_payload: emptySlice();
             }.toCell(),
-            code: initUser.code,
-            data: initUser.data
+            code: self.getJettonWalletInit(msg.to).code,
+            data: self.getJettonWalletInit(msg.to).data
         });
     }
 
@@ -148,19 +138,17 @@ contract AllodiumJettonMinter with Jetton {
         self.requireOwner();
         require(self.mintable, "Already closed");
         self.mintable = false;
-        self.lastInflationTime = now(); 
+        self.lastInflationTime = now();
     }
 
     receive("DistributeInflation") {
         require(!self.mintable, "Minting not closed");
         require(now() >= self.lastInflationTime + INFLATION_PERIOD, "Too early");
 
-        let increment: Int = self.totalSupply / 200; // 0.5%
+        let increment = self.totalSupply / 200;
         require(increment > 0, "Nothing to mint");
 
         self.lastInflationTime = now();
-
-        
         self.mintJetton(self.inflationAddress, increment, context().sender);
     }
 
@@ -168,8 +156,7 @@ contract AllodiumJettonMinter with Jetton {
         require(self.lastInflationTime > 0, "Minting has not started");
         require(now() >= self.lastInflationTime + INFLATION_PERIOD, "Too early");
 
-
-        let increment: Int = self.totalSupply / 200;
+        let increment = self.totalSupply / 200;
         require(increment > 0, "Nothing to mint");
 
         self.lastInflationTime = now();
@@ -177,11 +164,9 @@ contract AllodiumJettonMinter with Jetton {
     }
 
     fun getNftBonus(owner: Address): Int {
-    // Вызываем внешний контракт (например, NFT Registry), который возвращает лучший бонус
-        let bonus: Int = call(self.nftRegistry, "getBonusFor", owner);
-        return bonus;
-    }   
-    
+        return call(self.nftRegistry, "getBonusFor", owner);
+    }
+
     fun mintJetton(to: Address, amount: Int, response_destination: Address) {
         if (self.mintable) {
             require(self.totalSupply + amount <= self.max_supply, "Mint limit exceeded");
@@ -189,28 +174,28 @@ contract AllodiumJettonMinter with Jetton {
 
         self.totalSupply += amount;
 
-        let winit: StateInit = self.getJettonWalletInit(to);
+        let winit = self.getJettonWalletInit(to);
 
         send(SendParameters{
             to: contractAddress(winit),
             value: 0,
             bounce: false,
             mode: SendRemainingValue,
-            body: TokenTransferInternal{
-                queryId: 0,
-                amount: amount,
-                from: myAddress(),
-                response_destination: response_destination,
-                forward_ton_amount: 0,
-                forward_payload: emptySlice()
+            body: TransferInternal{
+                query_id: 0;
+                amount: amount;
+                from: myAddress();
+                response_destination: response_destination;
+                forward_ton_amount: 0;
+                forward_payload: emptySlice();
             }.toCell(),
             code: winit.code,
             data: winit.data
         });
     }
-    
+
     override fun getJettonWalletInit(address: Address): StateInit {
-        return initOf AllodiumJettonWallet(myAddress(), address);
+        return initOf AllodiumJettonWallet(myAddress(), address, self.inflationAddress);
     }
 
     override fun mint(to: Address, amount: Int, response_destination: Address) {
