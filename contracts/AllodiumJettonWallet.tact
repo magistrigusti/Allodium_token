@@ -2,9 +2,11 @@ import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "./messages";
 import "./constants";
-@interface("org.ton.jetton.wallet")
 
-struct  WalletData {
+const minTonsForStorage: Int = ton("0.01");
+const gasConsumption: Int = ton("0.005");
+
+struct WalletData {
     balance: Int;
     owner: Address;
     master: Address;
@@ -16,6 +18,7 @@ contract AllodiumJettonWallet with Ownable, Deployable {
     owner: Address;
     master: Address;
     inflation: Address;
+    
 
     init(master: Address, owner: Address, inflation: Address) {
         self.balance = 0;
@@ -135,7 +138,7 @@ contract AllodiumJettonWallet with Ownable, Deployable {
         self.balance = self.balance + msg.amount;
     }
 
-    bounced(msg: bounced<TokenBurnNotification>) {
+    bounced(msg: bounced<BurnNotification>) {
         self.balance += msg.amount;
     }
 

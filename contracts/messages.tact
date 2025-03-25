@@ -15,7 +15,7 @@ message(0xf8448400) TaxBurn {
     custom_payload: Cell?;
 }
 
-message(0x0f817ea5) Transfer {
+message(0x0f817ea5) TokenTransfer {
     query_id: Int as uint64;
     amount: Int as coins;
     destination: Address;
@@ -25,7 +25,7 @@ message(0x0f817ea5) Transfer {
     forward_payload: Slice as remaining;
 }
 
-message(0x178d4519) InternalTransfer {
+message(0x178d4519) TokenTransferInternal {
     query_id: Int as uint64;
     amount: Int as coins;
     from: Address;
@@ -34,14 +34,14 @@ message(0x178d4519) InternalTransfer {
     forward_payload: Slice as remaining;
 }
 
-message(0x7362d09c) TransferNotification {
+message(0x7362d09c) TokenNotification {
     query_id: Int as uint64;
     amount: Int as coins;
     sender: Address;
     forward_payload: Slice as remaining;
 }
 
-message(0xd53276db) Excesses {
+message(0xd53276db) TokenExcesses {
     query_id: Int as uint64;
 }
 
@@ -52,7 +52,7 @@ message(0x861d3536) Mine {
     to: Address;            
 }
 
-message(0x595f07bc) Burn {
+message(0x595f07bc) TokenBurn {
     query_id: Int as uint64;
     amount: Int as coins;
     response_destination: Address;
