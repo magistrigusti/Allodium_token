@@ -1,7 +1,7 @@
 export * from '../build/Allodium/tact_Allodium';
 
 import {
-  Address, Cell, beginCell, Contract, ContractProvider, Sender, SendMode, contractAddress
+  Address, toNano, Cell, beginCell, Contract, ContractProvider, Sender, SendMode, contractAddress
 } from '@ton/core';
 
 export type AllodiumJettonWalletConfig = {
@@ -65,4 +65,36 @@ export class AllodiumJettonWallet implements Contract {
       walletCode: result.stack.readCell(),
     }
   }
+
+  async sendTransfer(
+    provider: ContractProvider,
+    via: Sender,
+    params: {
+      queryId?: bigint,
+      amount: bigint,
+      destination: Address,
+      responseDestination?: Address | null,
+      forwardTonAmount: bigint,
+      forwardPayload: Cell
+    }
+  ) {
+    const body = beginCell()
+      .storeUint(0xf8a7ea5, 32)
+      .storeUint(params.queryId ?? 0n, 64)
+      .storeCoins(params.amount)
+      .storeAddress(params.destination)
+      .storeAddress(params.responseDestination ?? null)
+      .storeBit(0)
+      .storeCoins(params.forwardTonAmount)
+      .storeBit(1)
+      .storeRef(params.forwardPayload)
+    .endCell();
+
+    await provider.internal(via, {
+      value: params.forwardTonAmount + toNano("0.01"),
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body,
+    });
+  }
+
 }
