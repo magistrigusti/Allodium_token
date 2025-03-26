@@ -1,7 +1,8 @@
 export * from '../build/Allodium/tact_Allodium';
 
 import {
-  Address, toNano, Cell, beginCell, Contract, ContractProvider, Sender, SendMode, contractAddress
+  Address, toNano, Cell, beginCell, Contract, ContractProvider, 
+  Sender, SendMode, contractAddress, Builder,
 } from '@ton/core';
 
 export type AllodiumJettonWalletConfig = {
@@ -12,13 +13,17 @@ export type AllodiumJettonWalletConfig = {
 };
 
 export function allodiumJettonWalletConfigToCell(config: AllodiumJettonWalletConfig): Cell {
-  return beginCell()
-    .storeAddress(config.masterAddress)
-    .storeAddress(config.ownerAddress)
-    .storeAddress(config.burnAddress)
-    .storeAddress(config.inflationAddress)
-    .endCell();
+  const addrCell = new Builder()
+      .storeAddress(config.ownerAddress)
+      .storeAddress(config.burnAddress)
+      .storeAddress(config.inflationAddress)
+      .endCell();
+
+  return new Builder()
+      .storeRef(addrCell)
+      .endCell();
 }
+
 
 export class AllodiumJettonWallet implements Contract {
   constructor(
