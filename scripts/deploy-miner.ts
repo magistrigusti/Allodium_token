@@ -1,6 +1,6 @@
 import { toNano, Cell } from '@ton/core';
 import { NetworkProvider } from '@ton/blueprint';
-// import { AllodiumJettonMinter } from '../wrappers/AllodiumJettonMinter';
+import { AllodiumJettonMiner } from '../wrappers/AllodiumJettonMiner';
 
 export async function run(provider: NetworkProvider) {
     const sender = provider.sender(); // тот, кто деплоит
@@ -14,7 +14,7 @@ export async function run(provider: NetworkProvider) {
 
 
     const minter = provider.open(
-        AllodiumJettonMinter.createFromConfig(
+        AllodiumJettonMiner.createFromConfig(
             {
                 owner,
                 content,

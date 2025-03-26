@@ -7,6 +7,7 @@ import {
 export type AllodiumJettonWalletConfig = {
   masterAddress: Address;
   ownerAddress: Address;
+  burnAddress: Address;
   inflationAddress: Address;
 };
 
@@ -14,6 +15,7 @@ export function allodiumJettonWalletConfigToCell(config: AllodiumJettonWalletCon
   return beginCell()
     .storeAddress(config.masterAddress)
     .storeAddress(config.ownerAddress)
+    .storeAddress(config.burnAddress)
     .storeAddress(config.inflationAddress)
     .endCell();
 }

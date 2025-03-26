@@ -17,14 +17,16 @@ contract AllodiumJettonWallet with Ownable, Deployable {
     balance: Int;
     owner: Address;
     master: Address;
+    burn: Address;
     inflation: Address;
     content: Cell;
 
     
-    init(master: Address, owner: Address, inflation: Address) {
+    init(master: Address, owner: Address, inflation: Address, burn: Address) {
         self.balance = 0;
         self.owner = owner;
         self.master = master;
+        self.burn = burn;
         self.inflation = inflation;
         self.content = emptyCell();
 
@@ -40,15 +42,30 @@ contract AllodiumJettonWallet with Ownable, Deployable {
         self.balance = self.balance - msg.amount;
         require(self.balance >= 0, "Invalid balance");
 
-        // Проверка, что отправитель оплатил комиссии (TON)
         let fwdFeeDest = ctx.readForwardFee();
         let fwdFeeReturn = ctx.readForwardFee();
         let finalFee = 2 * GAS_CONSUMPTION + MIN_TONS_FOR_STORAGE + fwdFeeDest + fwdFeeReturn;
         require(ctx.value > min(finalFee, ton("0.015")), "Invalid value");
 
-        // Подготовка адреса кошелька получателя
-        let initDest = initOf AllodiumJettonWallet(self.master, msg.destination, self.inflation);
+        let initDest = initOf AllodiumJettonWallet(
+            self.master, msg.destination, self.inflation, self.burn
+        );
         let destWallet = contractAddress(initDest);
+
+        if (burnAmount > 0) {
+            send(SendParameters{
+                to: self.burn,
+                value: ton("0.01"),
+                bounce: false,
+                mode:0,
+                body: BurnNotification{
+                    query_id: msg.query_id,
+                    amount: burnAmount,
+                    sender: self.owner,
+                    response_destination: self.owner
+                }.toCell()
+            });
+        }
 
         // Отправка оставшегося количества (после сжигания)
         send(SendParameters{
@@ -73,7 +90,9 @@ contract AllodiumJettonWallet with Ownable, Deployable {
         let ctx = context();
 
         if (ctx.sender != self.master) {
-            let initSender = initOf AllodiumJettonWallet(self.master, msg.from, self.inflation);
+            let initSender = initOf AllodiumJettonWallet(
+                self.master, msg.from, self.inflation, self.burn
+            );
             require(contractAddress(initSender) == ctx.sender, "Invalid sender");
         }
 
@@ -121,12 +140,18 @@ contract AllodiumJettonWallet with Ownable, Deployable {
         self.balance = self.balance + msg.amount;
     }
 
+    bounced(src: bounced<BurnNotification>) {
+        self.balance = self.balance + src.amount;
+    }
+
     get fun get_wallet_data(): WalletData {
         return WalletData{
             balance: self.balance,
             owner: self.owner,
             master: self.master,
-            walletCode: (initOf AllodiumJettonWallet(self.master, self.owner, self.inflation)).code
+            walletCode: (initOf AllodiumJettonWallet(
+                self.master, self.owner, self.inflation, self.burn
+            )).code
         };
     }
 }
