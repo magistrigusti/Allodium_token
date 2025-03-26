@@ -8,6 +8,7 @@ struct JettonData {
     totalSupply: Int;
     mintable: Bool;
     owner: Address;
+    inflationAddress: Address;
     content: Cell;
     walletCode: Cell;
 }
@@ -16,12 +17,13 @@ trait Jetton with Ownable {
     totalSupply: Int;
     mintable: Bool;
     owner: Address;
+    inflationAddress: Address;
     content: Cell;
     max_supply: Int;
 
-    receive(msg: TokenUpdateContent) {
+    receive(msg: ChangeContent) {
         self.requireOwner(); 
-        self.content = msg.content;
+        self.content = msg.jetton_content;
     }
 
     receive(msg: BurnNotification) {
@@ -50,11 +52,12 @@ trait Jetton with Ownable {
     get fun get_jetton_data(): JettonData {
         let code = self.getJettonWalletInit(myAddress()).code;
         return JettonData{
-            totalSupply: self.totalSupply;
-            mintable: self.mintable;
-            owner: self.owner;
-            content: self.content;
-            walletCode: code;
+            totalSupply: self.totalSupply,
+            mintable: self.mintable,
+            owner: self.owner,
+            inflationAddress: self.inflationAddress,
+            content: self.content,
+            walletCode: code,
         };
     }
 
@@ -65,11 +68,11 @@ trait Jetton with Ownable {
 
 contract AllodiumJettonMinter with Jetton {
     nftRegistry: Address;
-    totalSupply: Int as coins;         
+    totalSupply: Int;         
     mintable: Bool;                    
     owner: Address;                    
     content: Cell;                    
-    max_supply: Int as coins;          
+    max_supply: Int;          
     rewardAddress: Address;           
     inflationAddress: Address;         
     lastInflationTime: Int as uint32;  
@@ -105,12 +108,12 @@ contract AllodiumJettonMinter with Jetton {
             bounce: false,
             mode: 0,
             body: TransferInternal{
-                query_id: 0;
-                amount: poolPart;
-                from: myAddress();
-                response_destination: self.owner;
-                forward_ton_amount: 0;
-                forward_payload: emptySlice();
+                query_id: 0,
+                amount: poolPart,
+                from: myAddress(),
+                response_destination: self.owner,
+                forward_ton_amount: 0,
+                forward_payload: emptySlice(),
             }.toCell(),
             code: self.getJettonWalletInit(self.rewardAddress).code,
             data: self.getJettonWalletInit(self.rewardAddress).data
@@ -122,12 +125,12 @@ contract AllodiumJettonMinter with Jetton {
             bounce: false,
             mode: SendRemainingValue,
             body: TransferInternal{
-                query_id: 0;
-                amount: userPart;
-                from: myAddress();
-                response_destination: self.owner;
-                forward_ton_amount: 0;
-                forward_payload: emptySlice();
+                query_id: 0,
+                amount: userPart,
+                from: myAddress(),
+                response_destination: self.owner,
+                forward_ton_amount: 0,
+                forward_payload: emptySlice(),
             }.toCell(),
             code: self.getJettonWalletInit(msg.to).code,
             data: self.getJettonWalletInit(msg.to).data
@@ -163,9 +166,9 @@ contract AllodiumJettonMinter with Jetton {
         self.mintJetton(msg.from, msg.amount, msg.to);
     }
 
-    fun getNftBonus(owner: Address): Int {
-        return call(self.nftRegistry, "getBonusFor", owner);
-    }
+    // fun getNftBonus(owner: Address): Int {
+    //     return call(self.nftRegistry, "getBonusFor", owner);
+    // }
 
     fun mintJetton(to: Address, amount: Int, response_destination: Address) {
         if (self.mintable) {
@@ -182,12 +185,12 @@ contract AllodiumJettonMinter with Jetton {
             bounce: false,
             mode: SendRemainingValue,
             body: TransferInternal{
-                query_id: 0;
-                amount: amount;
-                from: myAddress();
-                response_destination: response_destination;
-                forward_ton_amount: 0;
-                forward_payload: emptySlice();
+                query_id: 0,
+                amount: amount,
+                from: myAddress(),
+                response_destination: response_destination,
+                forward_ton_amount: 0,
+                forward_payload: emptySlice(),
             }.toCell(),
             code: winit.code,
             data: winit.data
@@ -198,7 +201,7 @@ contract AllodiumJettonMinter with Jetton {
         return initOf AllodiumJettonWallet(myAddress(), address, self.inflationAddress);
     }
 
-    override fun mint(to: Address, amount: Int, response_destination: Address) {
+    fun mint(to: Address, amount: Int, response_destination: Address) {
         self.mintJetton(to, amount, response_destination);
     }
 }
