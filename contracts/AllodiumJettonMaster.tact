@@ -17,11 +17,34 @@ struct TriggerInflation {
   value: Int;
 }
 
+struct JettonData {
+    totalSupply: Int;
+    mintable: Bool;
+    owner: Address;
+    content: Cell;
+    walletCode: Cell;
+}
+
+
 contract AllodiumJettonMaster with Deployable, Ownable {
   total_mined: Int;
   wallet_code: Cell;
   inflation_wallet: Address;
 
-  init(t)
+  init(t) {
+
+  }
+  
+  get fun get_jetton_data(): JettonData {
+    return JettonData {
+      totalSupply: self.total_mined,
+      mintable: true,
+      owner: self.owner,
+      content: Cell;
+      admin_address: self.owner,
+      walletCode: self.wallet_code
+    };
+  }
+
 }
 
