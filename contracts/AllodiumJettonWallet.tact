@@ -2,6 +2,7 @@ import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "./messages";
 import "./constants";
+import "./AllodiumJettonWallet";
 
 const MIN_TONS_FOR_STORAGE: Int = ton("0.01");
 const GAS_CONSUMPTION: Int = ton("0.005");
@@ -10,7 +11,10 @@ struct WalletData {
     balance: Int;
     owner: Address;
     master: Address;
-    walletCode: Cell;
+    burn: Address;
+    inflation: Address;
+    jeton_content: Cell;
+    wallet_code: Cell;
 }
 
 contract AllodiumJettonWallet with Ownable, Deployable {
@@ -19,23 +23,21 @@ contract AllodiumJettonWallet with Ownable, Deployable {
     master: Address;
     burn: Address;
     inflation: Address;
-    content: Cell;
+    jetton_content: Cell;
 
     
     init(master: Address,  args: Slice) {
-        let slice = args.loadRef().asSlice();
-        
-        self.owner = slice.loadAddress();
-        self.burn = slice.loadAddress();
-        self.inflation = slice.loadAddress();
+        self.owner = owner;
+        self.burn = burn;
+        self.inflation = inflation;
 
         self.master = master;
         self.balance = 0;
-        self.content = emptyCell();
+        self.content = content;
     }
 
     receive(msg: Transfer) {
-        let ctx = context();
+        let ctx: Context = context();
         require(ctx.sender == self.owner, "Invalid sender");
 
         let burnAmount = msg.amount / 10000;               // 0.01%
@@ -57,8 +59,6 @@ contract AllodiumJettonWallet with Ownable, Deployable {
         ).endCell();
 
         let initDest = initOf AllodiumJettonWallet(self.master, args.asSlice());
-
-
         let destWallet = contractAddress(initDest);
 
         if (burnAmount > 0) {
@@ -157,7 +157,7 @@ contract AllodiumJettonWallet with Ownable, Deployable {
     }
 
     bounced(src: bounced<BurnNotification>) {
-        self.balance = self.balance + src.amount;
+        self.balance = self.balance + msg.amount;
     }
 
     get fun get_wallet_data(): WalletData {
