@@ -4,8 +4,8 @@ import "./messages";
 import "./constants";
 import "./AllodiumJettonWallet";
 
-const MIN_TONS_FOR_STORAGE: Int = ton("0.01");
-const GAS_CONSUMPTION: Int = ton("0.005");
+const MIN_TONS_FOR_STORAGE: Int = ton("0.1");
+const GAS_CONSUMPTION: Int = ton("0.01");
 
 struct WalletData {
     balance: Int;
@@ -148,11 +148,27 @@ contract AllodiumJettonWallet with Ownable, Deployable {
     }
 
     receive(msg: TaxBurn) {
+        require(msg.amount > 0, "Amount must be positive");
+        require(self.balance >= msg.amount, "insufficient balance");
+        self.balance -= msg.amount;
 
+        send(BurnNotification {
+            quiery_id: msg.qery_id,
+            amount: msg.amount,
+            sender: msg.sender,
+            response_destination: msg.response_destination
+        });
+
+        send(SendParameters {
+            to: sender,
+            value: GAS_CONSUMPTION
+        });
     }
 
     receive(msg: Inflation) {
-        
+        require(msg.to == myAddress(), "Invalid recipient address");
+        require(msg.amount > 0, "Amount must be positive");
+        self.balance += msg.amount;
     }
 
     bounced(msg: bounced<TransferInternal>) {
