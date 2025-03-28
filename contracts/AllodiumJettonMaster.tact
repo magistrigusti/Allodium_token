@@ -3,6 +3,7 @@ import "@stdlib/deploy";
 import "./messages";
 
 const MONTHLY_INFLAION: Int = 416_666_666;
+const MAX_MINEABLE: Int = 500_000_000n * 10000n;
 
 struct InternalMint {
   query_id: Int;
@@ -28,11 +29,22 @@ struct JettonData {
 
 contract AllodiumJettonMaster with Deployable, Ownable {
   total_mined: Int;
-  wallet_code: Cell;
-  inflation_wallet: Address;
+  walletCode: Cell;
+  inflation: Address;
+  last_inflation: Int;
 
-  init(t) {
+  init(owner: Address, walletCode: Cell, iflation: Address) {
+    self.owner = owner;
+    self.walletCode = walletCode;
+    self.inflation = inflation;
+    self.total_mined = 0;
+    self.last_inflation = now();
+  }
 
+  receive(msg: Mine) {
+    require(msg.amount > 0, "zero-amount");
+    let new_total = self.total_mined + msg.amount;
+    require(new_total <= MAX_MINEABLE, "max-mint-limit");
   }
   
   get fun get_jetton_data(): JettonData {
@@ -40,9 +52,8 @@ contract AllodiumJettonMaster with Deployable, Ownable {
       totalSupply: self.total_mined,
       mintable: true,
       owner: self.owner,
-      content: Cell;
-      admin_address: self.owner,
-      walletCode: self.wallet_code
+      content: Cell.empty(),
+      walletCode: self.walletCode
     };
   }
 
