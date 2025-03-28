@@ -31,19 +31,23 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
     master: Address;
 
     init(master: Address, args: Slice) {
-        self.owner = args.loadAddress();         
-        self.burn = burn;         
-        self.inflation = args.loadAddress();    
+    let ownerAddr = args.loadAddress();     // адрес владельца
+    let burnAddr = args.loadAddress();      // адрес burn
+    let inflAddr = args.loadAddress();      // адрес инфляции
 
-        self.master = master;
-        self.balance = 0;
-        self.content = beginCell().endCell();    
+    self.owner = ownerAddr;
+    self.burn = burnAddr;
+    self.inflation = inflAddr;
 
-        self.totalSupply = 0;
-        self.mintable = true;
-        self.maxSupply = 0;         
+    self.master = master;
+    self.balance = 0;
+    self.content = beginCell().endCell();
 
+    self.totalSupply = 0;
+    self.mintable = true;
+    self.maxSupply = 0;
     }
+
     receive(msg: Transfer) {
         let ctx: Context = context();            
         require(ctx.sender == self.owner, "Invalid sender");
@@ -183,7 +187,7 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
         self.balance = self.balance + msg.amount;
     }
 
-    bounced(src: bounced<BurnNotification>) {
+    bounced(msg: bounced<BurnNotification>) {
         self.balance = self.balance + msg.amount;
     }
 
