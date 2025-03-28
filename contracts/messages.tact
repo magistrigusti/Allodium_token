@@ -7,7 +7,7 @@ message(0xd8cfdaf1) Inflation {
     to: Address;
 }
 
-message(0xf8448400) TaxBurn {
+message(0xf8448400) TokenBurn {
     query_id: Int as uint64;
     amount: Int as coins;
     sender: Address;
@@ -54,13 +54,6 @@ message(0x262f9a08) Mine {
 
 message(0xd2a7f71e) CloseMinting {
     query_id: Int as uint64;
-}
-
-message(0x595f07bc) TokenBurn {
-    query_id: Int as uint64;
-    amount: Int as coins;
-    response_destination: Address;
-    custom_payload: Cell?;
 }
 
 //master contract

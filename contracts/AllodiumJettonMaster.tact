@@ -70,7 +70,7 @@ trait JettonAllodium with Ownable {
 }
 
 
-contract AllodiumJettonMaster with Deployable, Ownable {
+contract AllodiumJettonMaster with Deployable, Ownable,  {
   total_mined: Int;
   walletCode: Cell;
   inflation: Address;

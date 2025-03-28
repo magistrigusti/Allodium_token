@@ -2,7 +2,7 @@ import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "./messages";
 import "./constants";
-import "./AllodiumJettonWallet"; // на случай initOf
+import "./AllodiumJettonMaster";
 
 struct JettonData {
     totalSupply: Int;
@@ -13,7 +13,7 @@ struct JettonData {
     walletCode: Cell;
 }
 
-contract AllodiumJettonMinter with Jetton {
+contract AllodiumJettonMinter with JettonAllodium {
     nftRegistry: Address;
     totalSupply: Int;         
     mintable: Bool;                    

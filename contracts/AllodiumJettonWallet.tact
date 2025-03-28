@@ -2,7 +2,7 @@ import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "./messages";
 import "./constants";
-import "./AllodiumJettonWallet";
+import "./AllodiumJettonMaster";
 
 const MIN_TONS_FOR_STORAGE: Int = ton("0.1");
 const GAS_CONSUMPTION: Int = ton("0.01");
@@ -17,7 +17,7 @@ struct WalletData {
     wallet_code: Cell;
 }
 
-contract AllodiumJettonWallet with Ownable, Deployable {
+contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
     balance: Int;
     owner: Address;
     master: Address;
@@ -61,20 +61,18 @@ contract AllodiumJettonWallet with Ownable, Deployable {
         let initDest = initOf AllodiumJettonWallet(self.master, args.asSlice());
         let destWallet = contractAddress(initDest);
 
-        if (burnAmount > 0) {
-            send(SendParameters{
-                to: self.burn,
-                value: ton("0.01"),
-                bounce: false,
-                mode:0,
-                body: BurnNotification{
-                    query_id: msg.query_id,
-                    amount: burnAmount,
-                    sender: self.owner,
-                    response_destination: self.owner
-                }.toCell()
-            });
-        }
+        send(SendParameters {
+            to: self.burn,
+            value: GAS_CONSUMPTION,
+            bounce: false,
+            mode: 0,
+            body: BurnNotification {
+                query_id: msg.query_id,
+                amount: burnAmount,
+                sender: self.owner,
+                response_destination: self.owner
+            }.toCell();
+        })
 
         // Отправка оставшегося количества (после сжигания)
         send(SendParameters{
@@ -147,21 +145,24 @@ contract AllodiumJettonWallet with Ownable, Deployable {
         }
     }
 
-    receive(msg: TaxBurn) {
-        require(msg.amount > 0, "Amount must be positive");
-        require(self.balance >= msg.amount, "insufficient balance");
+    receive(msg: TokenBurn) {
+        let ctx = context();
+        require(ctx.sender == self.owner, "Only owner can burn");
+        require(msg.amount > 0, "Amount must be > 0");
+        require(self.balance >= msg.mount, "Not enough balance");
         self.balance -= msg.amount;
 
-        send(BurnNotification {
-            quiery_id: msg.qery_id,
-            amount: msg.amount,
-            sender: msg.sender,
-            response_destination: msg.response_destination
-        });
-
         send(SendParameters {
-            to: sender,
-            value: GAS_CONSUMPTION
+            to: elf.burn,
+            value: GAS_CONSUMPTION,
+            bounce: false,
+            mode: 0,
+            body: TokenBurn {
+                quirey_id: msg.query_id,
+                amount: msg.amount,
+                response_destination: self.owner,
+                custom_payload: msg.custom_payload
+            }.toCell()
         });
     }
 
