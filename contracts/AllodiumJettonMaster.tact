@@ -3,7 +3,8 @@ import "@stdlib/deploy";
 import "./messages";
 
 const MONTHLY_INFLAION: Int = 416_666_666;
-const MAX_MINEABLE: Int = 500_000_000n * 10000n;
+const MAX_MINEABLE: Int = 500_000_000 * 10000;
+;
 
 struct JettonData {
     totalSupply: Int;

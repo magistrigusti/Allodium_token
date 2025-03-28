@@ -1,3 +1,5 @@
+// Обновлённая версия контракта AllodiumJettonWallet с учётом предложенных исправлений и комментариев
+
 import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "./messages";
@@ -23,24 +25,23 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
     master: Address;
     burn: Address;
     inflation: Address;
-    jetton_content: Cell;
+    jeton_content: Cell;
 
-    
-    init(master: Address,  args: Slice) {
-        self.owner = owner;
-        self.burn = burn;
-        self.inflation = inflation;
+    init(master: Address, args: Slice) {
+        self.owner = args.loadAddress();         // загружаем адрес владельца из аргументов
+        self.burn = args.loadAddress();          // загружаем адрес для сжигания
+        self.inflation = args.loadAddress();     // загружаем адрес инфляции
 
         self.master = master;
         self.balance = 0;
-        self.content = content;
+        self.content = Cell.empty();             // инициализируем контент пустой ячейкой (можно позже заменить на конкретный)
     }
 
     receive(msg: Transfer) {
-        let ctx: Context = context();
+        let ctx: Context = context();            // используем тип Context
         require(ctx.sender == self.owner, "Invalid sender");
 
-        let burnAmount = msg.amount / 10000;               // 0.01%
+        let burnAmount = msg.amount / 10000;     // 0.01% от суммы
         let transferAmount = msg.amount - burnAmount;
 
         self.balance = self.balance - msg.amount;
@@ -71,10 +72,10 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
                 amount: burnAmount,
                 sender: self.owner,
                 response_destination: self.owner
-            }.toCell();
-        })
+            }.toCell()
+        });
 
-        // Отправка оставшегося количества (после сжигания)
+        // отправка оставшегося количества (после сжигания)
         send(SendParameters{
             to: destWallet,
             value: 0,
@@ -94,7 +95,7 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
     }
 
     receive(msg: TransferInternal) {
-        let ctx = context();
+        let ctx: Context = context();
 
         if (ctx.sender != self.master) {
             let args = beginCell().storeRef(beginCell()
@@ -105,8 +106,6 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
             ).endCell();
 
             let initSender = initOf AllodiumJettonWallet(self.master, args.asSlice());
-
-
             require(contractAddress(initSender) == ctx.sender, "Invalid sender");
         }
 
@@ -146,20 +145,21 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
     }
 
     receive(msg: TokenBurn) {
-        let ctx = context();
+        let ctx: Context = context();
         require(ctx.sender == self.owner, "Only owner can burn");
         require(msg.amount > 0, "Amount must be > 0");
-        require(self.balance >= msg.mount, "Not enough balance");
+        require(self.balance >= msg.amount, "Not enough balance");
         self.balance -= msg.amount;
 
         send(SendParameters {
-            to: elf.burn,
+            to: self.burn,
             value: GAS_CONSUMPTION,
             bounce: false,
             mode: 0,
             body: TokenBurn {
-                quirey_id: msg.query_id,
+                query_id: msg.query_id,
                 amount: msg.amount,
+                sender: self.owner,
                 response_destination: self.owner,
                 custom_payload: msg.custom_payload
             }.toCell()
@@ -181,11 +181,7 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
     }
 
     get fun get_wallet_data(): WalletData {
-        return WalletData{
-        balance: self.balance,
-        owner: self.owner,
-        master: self.master,
-        walletCode: (initOf AllodiumJettonWallet(
+        let winit = initOf AllodiumJettonWallet(
             self.master,
             beginCell().storeRef(beginCell()
                 .storeAddress(self.owner)
@@ -193,8 +189,16 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
                 .storeAddress(self.inflation)
                 .endCell()
             ).endCell().asSlice()
-        )).code
+        );
+
+        return WalletData{
+            balance: self.balance,
+            owner: self.owner,
+            master: self.master,
+            burn: self.burn,
+            inflation: self.inflation,
+            jeton_content: self.content,
+            wallet_code: winit.code
         };
     }
-
 }
