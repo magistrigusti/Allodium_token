@@ -3,6 +3,8 @@ import "@stdlib/deploy";
 import "./messages";
 import "./AllodiumJettonWallet";
 
+
+
 const MONTHLY_INFLAION: Int = 416_666_666;
 const MAX_MINEABLE: Int = 500_000_000 * 10000;
 
@@ -26,7 +28,7 @@ trait JettonAllodium with Ownable {
 
   receive(msg: ChangeContent) {
     self.requireOwner();
-    self.content = msg.content;
+    self.content = msg.jetton_content;
   }
 
   receive(msg: BurnNotification) {
@@ -49,8 +51,17 @@ trait JettonAllodium with Ownable {
   }
 
   virtual fun getJettonWalletInit(address: Address): StateInit {
-    return initOf AllodiumJettonWallet(myAddress(), address, self.inflation);
+    let args = beginCell().storeRef(beginCell()
+        .storeAddress(address)           // owner
+        .storeAddress(self.owner)        // burn (передаётся как self.owner, если burn фиксированный)
+        .storeAddress(self.inflation)    // inflation
+        .endCell()
+    ).endCell();
+
+    return initOf AllodiumJettonWallet(myAddress(), args.asSlice());
+
   }
+
 
   get fun get_jetton_data(): JettonData {
     let code = self.getJettonWalletInit(myAddress()).code;
@@ -79,7 +90,7 @@ contract AllodiumJettonMaster with Deployable, Ownable,  {
   inflation: Address;
   last_inflation: Int;
 
-  init(owner: Address, walletCode: Cell, iflation: Address) {
+  init(owner: Address, walletCode: Cell, inflation: Address) {
     self.owner = owner;
     self.walletCode = walletCode;
     self.inflation = inflation;

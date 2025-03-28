@@ -68,6 +68,7 @@ message(0x7bdd97de) BurnNotification {
 message ChangeContent {
     query_id: Int as uint64;
     jetton_content: Cell;
+    wallet_code: Cell;
 }
 
 message(0x2c76b973) ProvideWalletAddress {

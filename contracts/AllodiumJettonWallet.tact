@@ -15,7 +15,7 @@ struct WalletData {
     master: Address;
     burn: Address;
     inflation: Address;
-    content: Cell;
+    jeton_content: Cell;
     walletCode: Cell;
 }
 
@@ -209,7 +209,7 @@ contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
             burn: self.burn,
             inflation: self.inflation,
             jeton_content: self.content,
-            wallet_code: winit.code
+            walletCode: winit.code
         };
     }
 }
