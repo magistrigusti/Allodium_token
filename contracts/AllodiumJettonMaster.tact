@@ -9,22 +9,22 @@ const MONTHLY_INFLAION: Int = 416_666_666;
 const MAX_MINEABLE: Int = 500_000_000 * 10000;
 
 
-struct JettonData {
-    totalSupply: Int;
-    mintable: Bool;
+struct AllodiumJettonData {
+    balance: Int as coins;
     owner: Address;
+    master: Addess;
     inflation: Address;
     content: Cell;
     walletCode: Cell;
 }
 
 trait JettonAllodium with Ownable {
-  totalSupply: Int;
-  mintable: Bool;
-  owner: Address;
-  inflation: Address;
-  content: Cell;
-  maxSupply: Int;
+    balance: Int as coins;
+    owner: Address;
+    master: Addess;
+    inflation: Address;
+    content: Cell;
+    walletCode: Cell;
 
   receive(msg: ChangeContent) {
     self.requireOwner();
@@ -96,6 +96,38 @@ contract AllodiumJettonMaster with Deployable, Ownable,  {
     self.inflation = inflation;
     self.total_mined = 0;
     self.last_inflation = now();
+  }
+
+  receive(msg: TokenBurn) {
+        let ctx: Context = context();
+        require(ctx.sender == self.owner, "Only owner can burn");
+        require(msg.amount > 0, "Amount must be > 0");
+        require(self.balance >= msg.amount, "Not enough balance");
+        self.balance -= msg.amount;
+
+        send(SendParameters {
+            to: self.burn,
+            value: GAS_CONSUMPTION,
+            bounce: false,
+            mode: 0,
+            body: TokenBurn {
+                query_id: msg.query_id,
+                amount: msg.amount,
+                sender: self.owner,
+                response_destination: self.owner,
+                custom_payload: msg.custom_payload
+            }.toCell()
+        });
+  }
+
+  receive(msg: Inflation) {
+        require(msg.to == myAddress(), "Invalid recipient address");
+        require(msg.amount > 0, "Amount must be positive");
+        self.balance += msg.amount;
+  }
+
+  bounced(msg: bounced<TransferInternal>) {
+        self.balance = self.balance + msg.amount;
   }
   
   get fun get_jetton_data(): JettonData {
