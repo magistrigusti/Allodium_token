@@ -45,7 +45,6 @@ message(0xd53276db) Excesses {
     query_id: Int as uint64;
 }
 
-//mine contract
 message(0x262f9a08) Mine {
     query_id: Int as uint64;
     amount: Int as coins;   
@@ -56,7 +55,6 @@ message(0xd2a7f71e) CloseMinting {
     query_id: Int as uint64;
 }
 
-//master contract
 
 message(0x7bdd97de) BurnNotification {
     queryId: Int as uint64;
