@@ -8,62 +8,9 @@ struct JettonData {
     totalSupply: Int;
     mintable: Bool;
     owner: Address;
-    inflationAddress: Address;
+    inflation: Address;
     content: Cell;
     walletCode: Cell;
-}
-
-trait Jetton with Ownable {
-    totalSupply: Int;
-    mintable: Bool;
-    owner: Address;
-    inflationAddress: Address;
-    content: Cell;
-    max_supply: Int;
-
-    receive(msg: ChangeContent) {
-        self.requireOwner(); 
-        self.content = msg.jetton_content;
-    }
-
-    receive(msg: BurnNotification) {
-        self.requireWallet(msg.sender); 
-        self.totalSupply -= msg.amount;
-
-        send(SendParameters{
-            to: msg.response_destination,
-            value: 0,
-            bounce: false,
-            mode: SendRemainingValue + SendIgnoreErrors,
-            body: Excesses{ query_id: msg.query_id }.toCell()
-        });
-    }
-
-    fun requireWallet(owner: Address) {
-        let ctx = context();
-        let expected = self.getJettonWalletInit(owner);
-        require(contractAddress(expected) == ctx.sender, "Invalid wallet sender");
-    }
-
-    virtual fun getJettonWalletInit(address: Address): StateInit {
-        return initOf AllodiumJettonWallet(myAddress(), address, self.inflationAddress);
-    }
-
-    get fun get_jetton_data(): JettonData {
-        let code = self.getJettonWalletInit(myAddress()).code;
-        return JettonData{
-            totalSupply: self.totalSupply,
-            mintable: self.mintable,
-            owner: self.owner,
-            inflationAddress: self.inflationAddress,
-            content: self.content,
-            walletCode: code,
-        };
-    }
-
-    get fun get_wallet_address(owner: Address): Address {
-        return contractAddress(self.getJettonWalletInit(owner));
-    }
 }
 
 contract AllodiumJettonMinter with Jetton {
@@ -137,34 +84,13 @@ contract AllodiumJettonMinter with Jetton {
         });
     }
 
-    receive("CloseMinting") {
+    receive(msg: CloseMinting) {
         self.requireOwner();
         require(self.mintable, "Already closed");
         self.mintable = false;
         self.lastInflationTime = now();
     }
 
-    receive("DistributeInflation") {
-        require(!self.mintable, "Minting not closed");
-        require(now() >= self.lastInflationTime + INFLATION_PERIOD, "Too early");
-
-        let increment = self.totalSupply / 200;
-        require(increment > 0, "Nothing to mint");
-
-        self.lastInflationTime = now();
-        self.mintJetton(self.inflationAddress, increment, context().sender);
-    }
-
-    receive(msg: Inflation) {
-        require(self.lastInflationTime > 0, "Minting has not started");
-        require(now() >= self.lastInflationTime + INFLATION_PERIOD, "Too early");
-
-        let increment = self.totalSupply / 200;
-        require(increment > 0, "Nothing to mint");
-
-        self.lastInflationTime = now();
-        self.mintJetton(msg.from, msg.amount, msg.to);
-    }
 
     // fun getNftBonus(owner: Address): Int {
     //     return call(self.nftRegistry, "getBonusFor", owner);

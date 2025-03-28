@@ -46,10 +46,14 @@ message(0xd53276db) Excesses {
 }
 
 //mine contract
-message(0x861d3536) Mine {
+message(0x262f9a08) Mine {
     query_id: Int as uint64;
     amount: Int as coins;   
     to: Address;            
+}
+
+message(0xd2a7f71e) CloseMinting {
+    query_id: Int as uint64;
 }
 
 message(0x595f07bc) TokenBurn {
@@ -58,6 +62,8 @@ message(0x595f07bc) TokenBurn {
     response_destination: Address;
     custom_payload: Cell?;
 }
+
+//master contract
 
 message(0x7bdd97de) BurnNotification {
     query_id: Int as uint64;

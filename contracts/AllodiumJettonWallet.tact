@@ -147,9 +147,12 @@ contract AllodiumJettonWallet with Ownable, Deployable {
         }
     }
 
-    receive(msg: ChangeContent) {
-        self.requireOwner();
-        self.content = msg.jetton_content;
+    receive(msg: TaxBurn) {
+
+    }
+
+    receive(msg: Inflation) {
+        
     }
 
     bounced(msg: bounced<TransferInternal>) {
