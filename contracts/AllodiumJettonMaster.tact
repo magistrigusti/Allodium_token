@@ -1,10 +1,11 @@
 import "@stdlib/ownable";
 import "@stdlib/deploy";
 import "./messages";
+import "./AllodiumJettonWallet";
 
 const MONTHLY_INFLAION: Int = 416_666_666;
 const MAX_MINEABLE: Int = 500_000_000 * 10000;
-;
+
 
 struct JettonData {
     totalSupply: Int;
@@ -48,7 +49,7 @@ trait JettonAllodium with Ownable {
   }
 
   virtual fun getJettonWalletInit(address: Address): StateInit {
-    return initOf AllodimJettonWallet(myAddress(), address, self.inflation);
+    return initOf AllodiumJettonWallet(myAddress(), address, self.inflation);
   }
 
   get fun get_jetton_data(): JettonData {
@@ -72,6 +73,7 @@ trait JettonAllodium with Ownable {
 
 
 contract AllodiumJettonMaster with Deployable, Ownable,  {
+  owner: Address;
   total_mined: Int;
   walletCode: Cell;
   inflation: Address;

@@ -15,30 +15,37 @@ struct WalletData {
     master: Address;
     burn: Address;
     inflation: Address;
-    jeton_content: Cell;
-    wallet_code: Cell;
+    content: Cell;
+    walletCode: Cell;
 }
 
 contract AllodiumJettonWallet with Ownable, Deployable, JettonAllodium {
+    totalSupply: Int;
+    mintable: Bool;
+    inflation: Address;
+    content: Cell;
+    maxSupply: Int;
+    burn: Address;
     balance: Int;
     owner: Address;
     master: Address;
-    burn: Address;
-    inflation: Address;
-    jeton_content: Cell;
 
     init(master: Address, args: Slice) {
-        self.owner = args.loadAddress();         // загружаем адрес владельца из аргументов
-        self.burn = args.loadAddress();          // загружаем адрес для сжигания
-        self.inflation = args.loadAddress();     // загружаем адрес инфляции
+        self.owner = args.loadAddress();         
+        self.burn = burn;         
+        self.inflation = args.loadAddress();    
 
         self.master = master;
         self.balance = 0;
-        self.content = Cell.empty();             // инициализируем контент пустой ячейкой (можно позже заменить на конкретный)
-    }
+        self.content = beginCell().endCell();    
 
+        self.totalSupply = 0;
+        self.mintable = true;
+        self.maxSupply = 0;         
+
+    }
     receive(msg: Transfer) {
-        let ctx: Context = context();            // используем тип Context
+        let ctx: Context = context();            
         require(ctx.sender == self.owner, "Invalid sender");
 
         let burnAmount = msg.amount / 10000;     // 0.01% от суммы
